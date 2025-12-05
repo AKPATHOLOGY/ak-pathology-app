@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AK Pathology Services Explorer</title>
+    <!-- Tailwind CSS (Fixed CDN for module error) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 300px;
+            max-height: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        /* Custom Scrollbar for tables */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        /* Print Styles for Report Generation */
+        @media print {
+            /* Hide everything except the print-target section and its children */
+            body > *:not(.print-target) { display: none !important; }
+            
+            .print-target { 
+                display: block !important; 
+                /* Ensures the print content takes over the page */
+                position: absolute; 
+                top: 0; 
+                left: 0; 
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+                background: white;
+                box-shadow: none; /* Remove shadows for clean printing */
+            }
+            /* Reset colors and text for printing */
+            .print-target, .print-target * {
+                color: black !important;
+                background-color: white !important;
+                border-color: #e5e7eb !important; /* light grey borders */
+            }
+            .no-print { display: none !important; }
+            
+            /* Specific styling for the report header/footer */
+            .print-target h2 { color: #1f2937 !important; font-size: 1.5rem; }
+            .print-target .border-t { border-top-width: 1px !important; }
+            .print-target .text-4xl { font-size: 2rem !important; }
+            .print-target .bg-slate-900 { background-color: white !important; }
+            .print-target .text-white { color: #1f2937 !important; } /* Dark text */
+            .print-target .text-blue-400 { color: #1e40af !important; } /* Darker blue for emphasis */
+            .print-target .chart-container { display: none !important; } /* Hide chart in print */
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+    <!-- Navigation / Header -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center gap-2">
+                        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">A</div>
+                        <span class="font-bold text-xl tracking-tight text-slate-900">AK Pathology</span>
+                    </div>
+                    <div class="hidden md:ml-6 md:flex md:space-x-8">
+                        <a href="#" class="border-blue-500 text-slate-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Services Catalog</a>
+                        <a href="#estimator" class="border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Cost Estimator</a>
+                        <a href="#data-tools" class="border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Data Tools</a>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center bg-slate-100 rounded-full p-1 border border-slate-200">
+                        <button id="btn-mode-b2c" class="px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-white shadow-sm text-blue-600" onclick="setMode('B2C')">Patient (B2C)</button>
+                        <button id="btn-mode-b2b" class="px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 text-slate-500 hover:text-slate-700" onclick="setMode('B2B')">Corporate (B2B)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+
+        <!-- Intro Section -->
+        <div class="text-center max-w-3xl mx-auto no-print">
+            <h1 class="text-3xl font-bold text-slate-900 sm:text-4xl">Laboratory Services Directory</h1>
+            <p class="mt-3 text-lg text-slate-600">
+                Explore our comprehensive diagnostic menu. Switch between <strong>Patient</strong> and <strong>Corporate</strong> modes to view relevant pricing. Use the estimator to calculate costs for specific requirements.
+            </p>
+        </div>
+
+        <!-- Dashboard Stats Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-8 no-print">
+            <!-- Chart 1: Turnaround Times -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-slate-900">Turnaround Time (TAT) Overview</h3>
+                    <p class="text-sm text-slate-500">Expected reporting time for key diagnostic categories.</p>
+                </div>
+                <div class="chart-container">
+                    <canvas id="tatChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Chart 2: Service Composition -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-slate-900">Service Portfolio Mix</h3>
+                    <p class="text-sm text-slate-500">Breakdown of available Tests vs. Wellness Packages.</p>
+                </div>
+                <div class="chart-container">
+                    <canvas id="mixChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Service Catalog Section -->
+        <section id="catalog" class="space-y-6 no-print">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">Service Catalog</h2>
+                    <p class="text-sm text-slate-500 mt-1">Search and filter diagnostic services.</p>
+                </div>
+                
+                <!-- Search & Filter -->
+                <div class="w-full md:w-auto flex flex-col sm:flex-row gap-3">
+                    <div class="relative">
+                        <input type="text" id="searchInput" placeholder="Search tests (e.g., Lipid, CBC)..." 
+                            class="w-full sm:w-64 pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow">
+                        <span class="absolute left-3 top-2.5 text-slate-400">🔍</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="border-b border-slate-200">
+                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                    <button onclick="switchTab('tests')" id="tab-tests" class="border-blue-500 text-blue-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                        Individual Tests
+                    </button>
+                    <button onclick="switchTab('packages')" id="tab-packages" class="border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                        Health Packages
+                    </button>
+                    <button onclick="switchTab('offers')" id="tab-offers" class="border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                        Special Offers
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Content Area -->
+            <div id="content-area" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Javascript will populate this -->
+            </div>
+
+            <!-- No Results State -->
+            <div id="no-results" class="hidden text-center py-12">
+                <div class="text-4xl mb-4">🧪</div>
+                <h3 class="text-lg font-medium text-slate-900">No services found</h3>
+                <p class="text-slate-500">Try adjusting your search terms.</p>
+            </div>
+        </section>
+
+        <!-- Cost Estimator / Cart Section -->
+        <section id="estimator" class="bg-slate-900 rounded-2xl text-white p-6 md:p-10 shadow-xl print-target">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <!-- List -->
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-bold">Cost Estimator</h2>
+                        <span id="cart-count" class="bg-blue-600 text-xs font-bold px-3 py-1 rounded-full">0 Items</span>
+                    </div>
+                    <p class="text-slate-400">Add services from the catalog above to estimate the total cost. Switch modes at the top to compare Standard vs Corporate rates.</p>
+                    
+                    <div class="bg-slate-800 rounded-xl p-1 overflow-hidden">
+                        <div class="max-h-64 overflow-y-auto custom-scrollbar p-4 space-y-3" id="cart-items">
+                            <p class="text-slate-500 text-center italic py-4">Your estimate list is empty.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary & Visual -->
+                <div class="lg:col-span-1 flex flex-col justify-between space-y-6">
+                    <div class="bg-white rounded-xl p-4 text-slate-900 no-print">
+                        <h3 class="font-bold text-sm text-slate-500 uppercase mb-4">Price Analysis</h3>
+                        <div class="chart-container" style="height: 200px;">
+                            <canvas id="costChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-700 pt-6">
+                        <div class="flex justify-between items-end mb-2">
+                            <span class="text-slate-400">Total Estimated Cost</span>
+                            <span id="total-price" class="text-4xl font-bold text-blue-400">₹0</span>
+                        </div>
+                        <p class="text-xs text-slate-500 text-right">*Prices are indicative.</p>
+                    </div>
+
+                    <!-- Export and Share Tools (NEW) -->
+                    <div class="space-y-3 no-print">
+                        <button onclick="printEstimate()" class="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-lg">
+                            🖨️ Generate PDF / Print
+                        </button>
+                        <div class="grid grid-cols-3 gap-3">
+                            <button onclick="shareEstimate('whatsapp')" class="flex items-center justify-center gap-1 bg-green-500 text-white p-2 rounded-lg text-xs font-medium hover:bg-green-600 transition-colors">
+                                💬 WhatsApp
+                            </button>
+                            <button onclick="shareEstimate('email')" class="flex items-center justify-center gap-1 bg-amber-500 text-white p-2 rounded-lg text-xs font-medium hover:bg-amber-600 transition-colors">
+                                📧 Email
+                            </button>
+                            <button onclick="shareEstimate('data-entry')" class="flex items-center justify-center gap-1 bg-slate-500 text-white p-2 rounded-lg text-xs font-medium hover:bg-slate-600 transition-colors">
+                                💾 Save Data (Mock)
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Technical Reference & Patient Data Tools (NEW SECTION) -->
+        <section id="data-tools" class="space-y-6 no-print">
+            <h2 class="text-2xl font-bold text-slate-900">Technical Reference & Data Tools</h2>
+            <p class="text-sm text-slate-500">View essential collection requirements and interact with mock patient data entry/view interfaces.</p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 1. Tube Guide (Technical Reference) -->
+                <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                    <h3 class="text-lg font-semibold text-slate-900">Blood Collection Tube Guide</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-xs">E</div>
+                            <p class="text-sm"><span class="font-medium">EDTA (Lavender):</span> Whole Blood, CBC, ESR.</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center text-slate-900 font-bold text-xs">C</div>
+                            <p class="text-sm"><span class="font-medium">Clot Activator (Yellow/Red):</span> Serum, Hormones, Immunoassays.</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white font-bold text-xs">F</div>
+                            <p class="text-sm"><span class="font-medium">Sodium Fluoride (Grey):</span> Plasma, Glucose/Sugar tests.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Mock Patient Data Entry/View -->
+                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                    <h3 class="text-lg font-semibold text-slate-900 flex justify-between items-center">
+                        Mock Patient Report Data 
+                        <span id="format-view-selector" class="flex items-center gap-2 text-xs text-slate-500">
+                            View: 
+                            <select onchange="viewReportFormat(this.value)" class="p-1 border border-slate-300 rounded-md">
+                                <option value="simple">Summary</option>
+                                <option value="detailed">Detailed Format</option>
+                            </select>
+                        </span>
+                    </h3>
+                    
+                    <div class="bg-slate-100 rounded-lg p-4 space-y-2 max-h-80 overflow-y-auto custom-scrollbar" id="mock-report-content">
+                        <!-- Content populated by JS -->
+                    </div>
+
+                    <button onclick="mockDataEntry()" class="w-full flex items-center justify-center gap-2 bg-slate-200 text-slate-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors">
+                        ➕ Add New Test Data (Mock Entry)
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-12 py-8 no-print">
+        <div class="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">
+            <p>&copy; 2024 AK Pathology. All rights reserved.</p>
+            <p class="mt-2">Generated from Laboratory Services Price List.</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- Data Source (Parsed from provided Markdown) ---
+        const catalogData = {
+            tests: [
+                { id: 't1', name: 'Complete Blood Count (CBC)', code: 'CBC', sample: 'Whole Blood', vol: '2.0 mL', tat: '4-6 hrs', container: 'EDTA Tube (Lavender)', priceB2C: 450, priceB2B: 400 },
+                { id: 't2', name: 'Fasting Blood Sugar (FBS)', code: 'FBS', sample: 'Plasma', vol: '1.0 mL', tat: '3-4 hrs', container: 'Sodium Fluoride (Grey)', priceB2C: 150, priceB2B: 130 },
+                { id: 't3', name: 'Lipid Profile, Complete', code: 'LIPID', sample: 'Serum', vol: '3.0 mL', tat: '6-8 hrs', container: 'Plain/Clot Activator', priceB2C: 990, priceB2B: 850 },
+                { id: 't4', name: 'Thyroid Stimulating Hormone (TSH)', code: 'TSH', sample: 'Serum', vol: '1.0 mL', tat: '24 hrs', container: 'Plain/Clot Activator', priceB2C: 650, priceB2B: 580 },
+                { id: 't5', name: 'Urine Routine & Microscopic', code: 'URM', sample: 'Random Urine', vol: '10.0 mL', tat: '4-6 hrs', container: 'Sterile Container', priceB2C: 200, priceB2B: 180 },
+                { id: 't6', name: 'C-Reactive Protein (CRP)', code: 'CRP', sample: 'Serum', vol: '1.0 mL', tat: '8-10 hrs', container: 'Plain/Clot Activator', priceB2C: 550, priceB2B: 500 },
+                { id: 't7', name: 'Vitamin D (25-OH)', code: 'VITD', sample: 'Serum', vol: '2.0 mL', tat: '48-72 hrs', container: 'Plain/Clot Activator', priceB2C: 1800, priceB2B: 1600 }
+            ],
+            packages: [
+                { id: 'p1', name: 'Basic Wellness Profile', details: 'CBC, FBS, Kidney, Liver', sample: 'Whole Blood, Plasma, Serum', tat: '8-12 hrs', priceB2C: 2499, priceB2B: 2000 },
+                { id: 'p2', name: 'Cardiac Risk Assessment', details: 'Lipid, hs-CRP, Apo A1/B', sample: 'Serum', tat: '24 hrs', priceB2C: 3999, priceB2B: 3200 },
+                { id: 'p3', name: 'Diabetic Management Profile', details: 'HbA1c, FBS, Fructosamine, Urine Micro', sample: 'Blood, Plasma, Urine', tat: '12-24 hrs', priceB2C: 3199, priceB2B: 2500 },
+                { id: 'p4', name: 'Senior Citizen Health Check', details: 'Basic + B12, TSH, Calcium', sample: 'Whole Blood, Serum', tat: '24 hrs', priceB2C: 4500, priceB2B: 3800 }
+            ],
+            offers: [
+                { id: 'o1', name: 'Monsoon Immunity Offer', details: 'CBC, Iron, Vit D', condition: 'Valid June-Aug', type: 'B2C', tat: '48 hrs', price: 2999 },
+                { id: 'o2', name: 'Corporate Basic Screening', details: 'Min 20 Employees', condition: 'Min 20 Employees', type: 'B2B', tat: '10 hrs', price: 1200 },
+                { id: 'o3', name: 'Executive Panel', details: 'Full Body (100+ params)', condition: '40+ Age Group', type: 'Both', tat: '24-48 hrs', price: 7999 },
+                { id: 'o4', name: 'Student Health Check', details: 'CBC, Urine R/M, HBsAg', condition: 'Student ID Req', type: 'B2C', tat: '24 hrs', price: 1150 }
+            ]
+        };
+
+        const mockPatientReport = {
+            patientName: 'Kajal Verma',
+            reportDate: '2024-05-15',
+            tests: [
+                { name: 'Hemoglobin', result: '13.5', units: 'g/dL', refRange: '12.0 - 15.0', status: 'Normal' },
+                { name: 'Glucose (Fasting)', result: '128', units: 'mg/dL', refRange: '70 - 100', status: 'High' },
+                { name: 'Total Cholesterol', result: '210', units: 'mg/dL', refRange: '< 200', status: 'High' },
+                { name: 'TSH', result: '3.1', units: 'mIU/L', refRange: '0.5 - 4.5', status: 'Normal' },
+            ]
+        };
+
+        // --- State Management ---
+        let appState = {
+            mode: 'B2C', // 'B2C' or 'B2B'
+            activeTab: 'tests', // 'tests', 'packages', 'offers'
+            searchQuery: '',
+            cart: [] // Array of item IDs
+        };
+
+        // --- Core Functions ---
+
+        function init() {
+            renderCharts();
+            renderCatalog();
+            updateEstimator();
+            renderMockReport('simple');
+        }
+
+        function setMode(mode) {
+            appState.mode = mode;
+            
+            // Update UI Buttons
+            const btnB2C = document.getElementById('btn-mode-b2c');
+            const btnB2B = document.getElementById('btn-mode-b2b');
+            
+            if (mode === 'B2C') {
+                btnB2C.className = "px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-white shadow-sm text-blue-600";
+                btnB2B.className = "px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 text-slate-500 hover:text-slate-700";
+            } else {
+                btnB2B.className = "px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-white shadow-sm text-blue-600";
+                btnB2C.className = "px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 text-slate-500 hover:text-slate-700";
+            }
+
+            renderCatalog();
+            updateEstimator();
+        }
+
+        function switchTab(tabName) {
+            appState.activeTab = tabName;
+            
+            // Update Tab UI
+            ['tests', 'packages', 'offers'].forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                if (t === tabName) {
+                    el.className = "border-blue-500 text-blue-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors";
+                } else {
+                    el.className = "border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors";
+                }
+            });
+
+            renderCatalog();
+        }
+
+        function getDisplayPrice(item) {
+            if (appState.activeTab === 'offers') {
+                // Offers have a fixed price regardless of B2C/B2B context in the data
+                return item.price;
+            }
+            return appState.mode === 'B2C' ? item.priceB2C : item.priceB2B;
+        }
+
+        function renderCatalog() {
+            const container = document.getElementById('content-area');
+            const noResults = document.getElementById('no-results');
+            container.innerHTML = '';
+
+            let data = catalogData[appState.activeTab];
+            
+            // Filter by Search
+            if (appState.searchQuery) {
+                const q = appState.searchQuery.toLowerCase();
+                data = data.filter(item => 
+                    item.name.toLowerCase().includes(q) || 
+                    (item.code && item.code.toLowerCase().includes(q)) ||
+                    (item.details && item.details.toLowerCase().includes(q))
+                );
+            }
+
+            if (data.length === 0) {
+                noResults.classList.remove('hidden');
+            } else {
+                noResults.classList.add('hidden');
+                
+                data.forEach(item => {
+                    const price = getDisplayPrice(item);
+                    const isAdded = appState.cart.includes(item.id);
+                    
+                    let badge = '';
+                    if (appState.activeTab === 'offers') {
+                        if (item.type === 'B2B') badge = `<span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full">Corporate Only</span>`;
+                        if (item.type === 'B2C') badge = `<span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">Patient Offer</span>`;
+                        if (item.type === 'Both') badge = `<span class="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full">Both</span>`;
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = "bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col justify-between h-full";
+                    
+                    let technicalDetails = '';
+                    if (appState.activeTab === 'tests') {
+                        technicalDetails = `
+                            <div class="mt-4 space-y-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+                                <div class="flex justify-between"><span>Sample:</span> <span class="font-medium text-slate-700">${item.sample}</span></div>
+                                <div class="flex justify-between"><span>Container:</span> <span class="font-medium text-slate-700">${item.container}</span></div>
+                                <div class="flex justify-between"><span>Vol:</span> <span class="font-medium text-slate-700">${item.vol}</span></div>
+                            </div>
+                        `;
+                    } else if (appState.activeTab === 'packages') {
+                        technicalDetails = `
+                            <div class="mt-4 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+                                <p class="mb-1"><span class="font-semibold">Includes:</span> ${item.details}</p>
+                                <p><span>Sample:</span> ${item.sample}</p>
+                            </div>
+                        `;
+                    } else { // Offers
+                        technicalDetails = `
+                            <div class="mt-4 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+                                <p class="mb-1"><span class="font-semibold">Details:</span> ${item.details}</p>
+                                <p><span class="font-semibold">Condition:</span> ${item.condition}</p>
+                            </div>
+                        `;
+                    }
+
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-bold text-lg text-slate-800 leading-tight">${item.name}</h3>
+                                ${badge}
+                            </div>
+                            <div class="text-sm text-slate-500 mb-2 flex items-center gap-2">
+                                <span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-semibold">TAT: ${item.tat}</span>
+                            </div>
+                            ${technicalDetails}
+                        </div>
+                        <div class="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-2xl font-bold text-slate-900">₹${price.toLocaleString()}</span>
+                            <button onclick="toggleCart('${item.id}')" class="${isAdded ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100' : 'bg-blue-600 text-white hover:bg-blue-700'} px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                                ${isAdded ? 'Remove' : 'Add to Estimate'}
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+        }
+
+        function toggleCart(id) {
+            if (appState.cart.includes(id)) {
+                appState.cart = appState.cart.filter(itemId => itemId !== id);
+            } else {
+                appState.cart.push(id);
+            }
+            renderCatalog();
+            updateEstimator();
+        }
+
+        function updateEstimator() {
+            const listContainer = document.getElementById('cart-items');
+            const totalEl = document.getElementById('total-price');
+            const countEl = document.getElementById('cart-count');
+            
+            listContainer.innerHTML = '';
+            
+            let total = 0;
+            let b2cTotal = 0;
+            let b2bTotal = 0;
+
+            if (appState.cart.length === 0) {
+                listContainer.innerHTML = `<p class="text-slate-500 text-center italic py-4">Your estimate list is empty.</p>`;
+                totalEl.innerText = "₹0";
+                countEl.innerText = "0 Items";
+                updateCostChart(0, 0);
+                return;
+            }
+
+            const allItems = [...catalogData.tests, ...catalogData.packages, ...catalogData.offers];
+
+            appState.cart.forEach(id => {
+                const item = allItems.find(i => i.id === id);
+                if (item) {
+                    const price = getDisplayPrice(item);
+                    
+                    // Calculate B2C and B2B totals for the chart comparison
+                    if (catalogData.offers.find(o => o.id === id)) {
+                        // For offers, we assume the price is the same for comparison purposes if not specified
+                        b2cTotal += item.price; 
+                        b2bTotal += item.price;
+                    } else {
+                        b2cTotal += item.priceB2C;
+                        b2bTotal += item.priceB2B;
+                    }
+
+                    total += price;
+
+                    const row = document.createElement('div');
+                    row.className = "flex justify-between items-center text-sm border-b border-slate-700 pb-2 last:border-0";
+                    row.innerHTML = `
+                        <div class="truncate pr-2 text-slate-200 w-2/3">${item.name}</div>
+                        <div class="text-right">
+                            <span class="block text-white font-medium">₹${price.toLocaleString()}</span>
+                            <button onclick="toggleCart('${item.id}')" class="text-xs text-red-400 hover:text-red-300">remove</button>
+                        </div>
+                    `;
+                    listContainer.appendChild(row);
+                }
+            });
+
+            totalEl.innerText = `₹${total.toLocaleString()}`;
+            countEl.innerText = `${appState.cart.length} Items`;
+
+            updateCostChart(b2cTotal, b2bTotal);
+        }
+
+        // --- Export & Share Functions (NEW) ---
+
+        function printEstimate() {
+            // This function triggers the browser's print dialog, which allows saving as PDF.
+            window.print();
+        }
+
+        function shareEstimate(platform) {
+            const currentTotal = document.getElementById('total-price').innerText;
+            const itemNames = appState.cart.map(id => {
+                const item = [...catalogData.tests, ...catalogData.packages, ...catalogData.offers].find(i => i.id === id);
+                return item ? item.name : 'Unknown Service';
+            }).join(', ');
+
+            const message = `AK Pathology Estimate (${appState.mode}): ${itemNames}. Total Cost: ${currentTotal}. View details here: ${window.location.href}`;
+            
+            let mockMessage = '';
+
+            if (platform === 'whatsapp') {
+                // Mock WhatsApp share link (uses window.open for demonstration)
+                const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                window.open(whatsappUrl, '_blank');
+                mockMessage = `WhatsApp share initiated (pop-up may be blocked).`;
+            } else if (platform === 'email') {
+                // Mock Email share (uses mailto link)
+                const emailSubject = `AK Pathology Service Estimate (${appState.mode})`;
+                const emailBody = `Dear recipient,\n\nPlease find the estimated cost for the selected services:\n\nItems: ${itemNames}\nTotal Cost: ${currentTotal}\n\nView the interactive estimator here: ${window.location.href}`;
+                const mailtoUrl = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                window.location.href = mailtoUrl;
+                mockMessage = `Email compose initiated.`;
+            } else if (platform === 'data-entry') {
+                mockMessage = `Mock: Estimate data saved/logged successfully. Total items: ${appState.cart.length}.`;
+            }
+
+            // Simple notification system
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-5 right-5 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-xl text-sm transition-opacity duration-300 z-50';
+            notification.innerText = mockMessage;
+            document.body.appendChild(notification);
+            
+            // Auto-hide notification
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        function mockDataEntry() {
+            shareEstimate('data-entry'); // Reuses the mock notification system
+            // In a real app, this would open a modal for data input and saving.
+        }
+
+        function viewReportFormat(format) {
+            renderMockReport(format);
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-5 right-5 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-xl text-sm transition-opacity duration-300 z-50 no-print';
+            notification.innerText = `Report format switched to: ${format}`;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        function renderMockReport(format) {
+            const container = document.getElementById('mock-report-content');
+            let content = '';
+            
+            const patientInfo = `<p class="font-bold text-slate-900">Patient: ${mockPatientReport.patientName} | Date: ${mockPatientReport.reportDate}</p><hr class="my-2 border-slate-300">`;
+
+            if (format === 'simple') {
+                content = patientInfo + mockPatientReport.tests.map(t => {
+                    const statusClass = t.status === 'High' ? 'bg-red-500' : t.status === 'Low' ? 'bg-yellow-500' : 'bg-green-500';
+                    return `
+                        <div class="flex justify-between items-center py-1">
+                            <span class="text-sm font-medium">${t.name}</span>
+                            <span class="flex items-center gap-2">
+                                <span class="font-bold text-slate-800">${t.result} ${t.units}</span>
+                                <span class="text-xs text-white ${statusClass} px-2 py-0.5 rounded-full">${t.status}</span>
+                            </span>
+                        </div>
+                    `;
+                }).join('');
+            } else if (format === 'detailed') {
+                content = `
+                    ${patientInfo}
+                    <div class="grid grid-cols-5 font-semibold text-xs text-slate-600 border-b border-slate-300 pb-1">
+                        <span>Test Name</span>
+                        <span class="text-center">Result</span>
+                        <span class="text-center">Units</span>
+                        <span class="col-span-2 text-right">Reference Range</span>
+                    </div>
+                ` + mockPatientReport.tests.map(t => {
+                    const statusClass = t.status === 'High' ? 'text-red-600 font-bold' : t.status === 'Low' ? 'text-yellow-600 font-bold' : 'text-green-600';
+                    return `
+                        <div class="grid grid-cols-5 text-sm py-1 border-b border-slate-200 last:border-0">
+                            <span class="text-slate-800">${t.name}</span>
+                            <span class="text-center ${statusClass}">${t.result}</span>
+                            <span class="text-center text-slate-500">${t.units}</span>
+                            <span class="col-span-2 text-right text-slate-500">${t.refRange}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+            container.innerHTML = content;
+        }
+
+
+        // --- Search Listener ---
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            appState.searchQuery = e.target.value;
+            renderCatalog();
+        });
+
+        // --- Charts Implementation ---
+        
+        let costChartInstance = null;
+
+        function renderCharts() {
+            // 1. TAT Overview Chart
+            const ctxTAT = document.getElementById('tatChart').getContext('2d');
+            new Chart(ctxTAT, {
+                type: 'bar',
+                data: {
+                    labels: ['Blood Sugar', 'CBC', 'Lipid Profile', 'Thyroid (TSH)', 'Vit D', 'Packages'],
+                    datasets: [{
+                        label: 'Avg Hours',
+                        data: [4, 6, 8, 24, 72, 24],
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            title: { display: true, text: 'Hours' }
+                        }
+                    }
+                }
+            });
+
+            // 2. Mix Chart
+            const ctxMix = document.getElementById('mixChart').getContext('2d');
+            new Chart(ctxMix, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Individual Tests', 'Health Packages', 'Special Offers'],
+                    datasets: [{
+                        data: [7, 4, 4],
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+
+            // 3. Cost Chart (Initialized empty)
+            const ctxCost = document.getElementById('costChart').getContext('2d');
+            costChartInstance = new Chart(ctxCost, {
+                type: 'bar',
+                data: {
+                    labels: ['B2C (Standard)', 'B2B (Corporate)'],
+                    datasets: [{
+                        label: 'Total Cost (₹)',
+                        data: [0, 0],
+                        backgroundColor: ['#94a3b8', '#3b82f6'],
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return '₹' + context.raw.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            grid: { display: false },
+                            ticks: { color: '#1e293b', font: { weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateCostChart(b2c, b2b) {
+            if (costChartInstance) {
+                costChartInstance.data.datasets[0].data = [b2c, b2b];
+                costChartInstance.update();
+            }
+        }
+
+        // --- Init ---
+        window.onload = init;
+
+    </script>
+</body>
+</html>
